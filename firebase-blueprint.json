@@ -1,0 +1,204 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public user profile information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "username": { "type": "string", "maxLength": 50, "pattern": "^[a-zA-Z0-9_.]+$" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "avatarUrl": { "type": "string", "maxLength": 500 },
+        "bio": { "type": "string", "maxLength": 300 },
+        "website": { "type": "string", "maxLength": 200 },
+        "isVerified": { "type": "boolean" },
+        "isAdmin": { "type": "boolean" },
+        "followersCount": { "type": "number" },
+        "followingCount": { "type": "number" },
+        "postsCount": { "type": "number" },
+        "isPrivate": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "username", "displayName"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Private sensitive user settings and PII",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 128 },
+        "blockedUserIds": { "type": "array" },
+        "savedPostIds": { "type": "array" },
+        "allowDirectMessages": { "type": "string", "enum": ["everyone", "following", "none"] },
+        "allowComments": { "type": "string", "enum": ["everyone", "following", "none"] }
+      },
+      "required": ["email"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Feed post or vertical video reel",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorUsername": { "type": "string", "maxLength": 50 },
+        "authorAvatar": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["image", "video"] },
+        "mediaUrl": { "type": "string", "maxLength": 100000 },
+        "thumbnailUrl": { "type": "string", "maxLength": 100000 },
+        "aspectRatio": { "type": "string", "maxLength": 20 },
+        "caption": { "type": "string", "maxLength": 2200 },
+        "tags": { "type": "array" },
+        "location": { "type": "string", "maxLength": 100 },
+        "audioTrack": { "type": "string", "maxLength": 100 },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "sharesCount": { "type": "number" },
+        "viewsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "type", "mediaUrl", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Post comment",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "maxLength": 128 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorUsername": { "type": "string", "maxLength": 50 },
+        "authorAvatar": { "type": "string", "maxLength": 500 },
+        "text": { "type": "string", "maxLength": 500 },
+        "likesCount": { "type": "number" },
+        "parentCommentId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "authorId", "text", "createdAt"]
+    },
+    "Story": {
+      "title": "Story",
+      "description": "24-hour disappearing story",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string", "maxLength": 128 },
+        "authorUsername": { "type": "string", "maxLength": 50 },
+        "authorAvatar": { "type": "string", "maxLength": 500 },
+        "mediaUrl": { "type": "string", "maxLength": 100000 },
+        "text": { "type": "string", "maxLength": 280 },
+        "backgroundGradient": { "type": "string", "maxLength": 100 },
+        "viewers": { "type": "array" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorId", "createdAt", "expiresAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification for activity",
+      "type": "object",
+      "properties": {
+        "recipientId": { "type": "string", "maxLength": 128 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorUsername": { "type": "string", "maxLength": 50 },
+        "actorAvatar": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["like", "comment", "follow", "mention", "system"] },
+        "targetPostId": { "type": "string", "maxLength": 128 },
+        "text": { "type": "string", "maxLength": 300 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["recipientId", "actorId", "type", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Direct messaging conversation metadata",
+      "type": "object",
+      "properties": {
+        "participantIds": { "type": "array" },
+        "participantDetails": { "type": "object" },
+        "lastMessage": { "type": "string", "maxLength": 500 },
+        "lastSenderId": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["participantIds", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Direct message in a conversation",
+      "type": "object",
+      "properties": {
+        "conversationId": { "type": "string", "maxLength": 128 },
+        "senderId": { "type": "string", "maxLength": 128 },
+        "text": { "type": "string", "maxLength": 1000 },
+        "mediaUrl": { "type": "string", "maxLength": 100000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array" }
+      },
+      "required": ["conversationId", "senderId", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Content moderation report",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string", "maxLength": 128 },
+        "targetType": { "type": "string", "enum": ["post", "user", "comment"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetDetails": { "type": "string", "maxLength": 1000 },
+        "reason": { "type": "string", "maxLength": 200 },
+        "status": { "type": "string", "enum": ["pending", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterId", "targetType", "targetId", "reason", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Public user profiles"
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": "UserPrivateInfo",
+      "description": "Private user preferences and sensitive data"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Image and video posts / reels"
+    },
+    "/posts/{postId}/likes/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Likes on posts"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on posts"
+    },
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "User stories with 24h expiration"
+    },
+    "/follows/{followId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Follow relationships"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Direct message threads"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages inside conversation thread"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Notifications for users"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Flagged content and reports"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Admin privileges collection"
+    }
+  }
+}

@@ -1,0 +1,193 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'ramzanelectronicsburewala@gmail.com'
+      );
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true;
+
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidId(userId)
+        && incoming().userId == request.auth.uid
+        && incoming().username is string && incoming().username.size() >= 2 && incoming().username.size() <= 50
+        && incoming().displayName is string && incoming().displayName.size() <= 100
+        && (!('isAdmin' in incoming()) || incoming().isAdmin == false || isAdmin())
+        && (!('isVerified' in incoming()) || incoming().isVerified == false || isAdmin());
+
+      allow update: if isSignedIn() && (
+        (isOwner(userId) && (
+          // Standard profile edit: allowed to edit displayName, bio, avatarUrl, website, isPrivate
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'bio', 'avatarUrl', 'website', 'isPrivate', 'updatedAt'])
+        )) ||
+        // Counter increments for follower/following/posts updates
+        (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['followersCount', 'followingCount', 'postsCount'])) ||
+        // Admin override
+        isAdmin()
+      );
+
+      allow delete: if isAdmin() || isOwner(userId);
+
+      // Private User Info & Settings Subcollection
+      match /private/{docId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // 2. Posts (Image, Carousel, Video Reels)
+    match /posts/{postId} {
+      allow get: if true;
+      allow list: if true;
+
+      allow create: if isSignedIn() && isValidId(postId)
+        && incoming().authorId == request.auth.uid
+        && incoming().type in ['image', 'video']
+        && incoming().mediaUrl is string && incoming().mediaUrl.size() > 0
+        && (!('caption' in incoming()) || incoming().caption.size() <= 2200);
+
+      allow update: if isSignedIn() && (
+        // Author can update caption or tags
+        (isOwner(existing().authorId) && incoming().authorId == existing().authorId && incoming().diff(existing()).affectedKeys().hasOnly(['caption', 'tags', 'updatedAt'])) ||
+        // Any signed-in user can increment engagement counters (likes, comments, views, shares)
+        (incoming().authorId == existing().authorId && incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'commentsCount', 'sharesCount', 'viewsCount'])) ||
+        isAdmin()
+      );
+
+      allow delete: if isSignedIn() && (isOwner(existing().authorId) || isAdmin());
+
+      // Post Likes subcollection
+      match /likes/{userId} {
+        allow read: if true;
+        allow create, delete: if isOwner(userId);
+      }
+
+      // Post Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isValidId(commentId)
+          && incoming().authorId == request.auth.uid
+          && incoming().text is string && incoming().text.size() > 0 && incoming().text.size() <= 500;
+        allow update: if isSignedIn() && (
+          (isOwner(existing().authorId) && incoming().diff(existing()).affectedKeys().hasOnly(['text', 'updatedAt'])) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['likesCount']) ||
+          isAdmin()
+        );
+        allow delete: if isSignedIn() && (isOwner(existing().authorId) || isAdmin());
+      }
+    }
+
+    // 3. Stories (24h ephemeral posts)
+    match /stories/{storyId} {
+      allow get: if true;
+      allow list: if true;
+
+      allow create: if isSignedIn() && isValidId(storyId)
+        && incoming().authorId == request.auth.uid;
+
+      allow update: if isSignedIn() && (
+        // Adding viewer to viewers list
+        incoming().diff(existing()).affectedKeys().hasOnly(['viewers']) ||
+        isAdmin()
+      );
+
+      allow delete: if isSignedIn() && (isOwner(existing().authorId) || isAdmin());
+    }
+
+    // 4. Follows
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidId(followId) && incoming().followerId == request.auth.uid;
+      allow delete: if isSignedIn() && (existing().followerId == request.auth.uid || isAdmin());
+    }
+
+    // 5. Direct Message Conversations
+    match /conversations/{conversationId} {
+      allow get: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+      allow list: if isSignedIn() && request.auth.uid in resource.data.participantIds;
+
+      allow create: if isSignedIn() && isValidId(conversationId)
+        && request.auth.uid in incoming().participantIds
+        && incoming().participantIds.size() <= 10;
+
+      allow update: if isSignedIn() && request.auth.uid in existing().participantIds
+        && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'lastSenderId', 'updatedAt', 'participantDetails']);
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds;
+        allow create: if isSignedIn() && isValidId(messageId)
+          && incoming().senderId == request.auth.uid
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantIds
+          && incoming().text is string && incoming().text.size() <= 1000;
+        allow update: if isSignedIn() && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['readBy']) ||
+          isAdmin()
+        );
+        allow delete: if isAdmin() || (isSignedIn() && existing().senderId == request.auth.uid);
+      }
+    }
+
+    // 6. Notifications
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.recipientId == request.auth.uid;
+
+      allow create: if isSignedIn() && isValidId(notificationId)
+        && incoming().actorId == request.auth.uid;
+
+      allow update: if isSignedIn() && existing().recipientId == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+
+      allow delete: if isSignedIn() && (existing().recipientId == request.auth.uid || isAdmin());
+    }
+
+    // 7. Reports & Moderation
+    match /reports/{reportId} {
+      allow get: if isAdmin() || (isSignedIn() && resource.data.reporterId == request.auth.uid);
+      allow list: if isAdmin();
+
+      allow create: if isSignedIn() && isValidId(reportId)
+        && incoming().reporterId == request.auth.uid
+        && incoming().status == 'pending';
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 8. Admins collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

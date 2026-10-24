@@ -1,0 +1,6 @@
+{
+  "name": "Pulse - Social Network",
+  "description": "Modern social media platform with short-form video reels, stories, photo sharing, explore, and direct messaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
